@@ -94,3 +94,16 @@ func broadcastMessage(currentConn *WebSocketConnection, kind, message string) {
 		})
 	}
 }
+
+func ws(w http.ResponseWriter, r *http.Request) {
+	currentGorillaConn, err := websocket.Upgrade(w, r, w.Header(), 1024, 1024)
+	if err != nil {
+		http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
+	}
+
+	username := r.URL.Query().Get("username")
+	currentConn := WebSocketConnection{Conn: currentGorillaConn, Username: username}
+	connections = append(connections, &currentConn)
+
+	go handleIO(&currentConn, connections)
+}

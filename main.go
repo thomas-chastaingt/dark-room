@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"html/template"
 	"log"
 	"net/http"
+	"path"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -34,32 +35,16 @@ type WebSocketConnection struct {
 	Username string
 }
 
-func main() {
-	http.HandleFunc("/room", func(w http.ResponseWriter, r *http.Request) {
-		content, err := ioutil.ReadFile("static/template/room.html")
-		if err != nil {
-			http.Error(w, "Could not open requested file", http.StatusInternalServerError)
-			return
-		}
-
-		fmt.Fprintf(w, "%s", content)
-	})
-
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		currentGorillaConn, err := websocket.Upgrade(w, r, w.Header(), 1024, 1024)
-		if err != nil {
-			http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
-		}
-
-		username := r.URL.Query().Get("username")
-		currentConn := WebSocketConnection{Conn: currentGorillaConn, Username: username}
-		connections = append(connections, &currentConn)
-
-		go handleIO(&currentConn, connections)
-	})
-
-	fmt.Println("Server starting at :8080")
-	http.ListenAndServe(":8080", nil)
+func HandleRoom(w http.ResponseWriter, r *http.Request) {
+	fp := path.Join("web/templates", "room.html")
+	tmpl, err := template.ParseFiles(fp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := tmpl.Execute(w, nil); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func handleIO(currentConn *WebSocketConnection, connections []*WebSocketConnection) {
@@ -108,4 +93,26 @@ func broadcastMessage(currentConn *WebSocketConnection, kind, message string) {
 			Message: message,
 		})
 	}
+}
+
+func main() {
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+
+	http.HandleFunc("/room", HandleRoom)
+
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		currentGorillaConn, err := websocket.Upgrade(w, r, w.Header(), 1024, 1024)
+		if err != nil {
+			http.Error(w, "Could not open websocket connection", http.StatusBadRequest)
+		}
+
+		username := r.URL.Query().Get("username")
+		currentConn := WebSocketConnection{Conn: currentGorillaConn, Username: username}
+		connections = append(connections, &currentConn)
+
+		go handleIO(&currentConn, connections)
+	})
+
+	fmt.Println("Server starting at :8080")
+	http.ListenAndServe(":8080", nil)
 }

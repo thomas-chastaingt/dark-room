@@ -35,7 +35,20 @@ type WebSocketConnection struct {
 	Username string
 }
 
+func HandleHome(w http.ResponseWriter, r *http.Request) {
+	fp := path.Join("web/templates", "index.html")
+	tmpl, err := template.ParseFiles(fp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := tmpl.Execute(w, nil); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func HandleRoom(w http.ResponseWriter, r *http.Request) {
+
 	fp := path.Join("web/templates", "room.html")
 	tmpl, err := template.ParseFiles(fp)
 	if err != nil {
